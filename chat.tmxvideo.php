@@ -6,6 +6,7 @@ Aseco::registerEvent("onStartup", "tmxv_onStartup");
 Aseco::registerEvent('onNewChallenge','tmxv_onNewTrack');
 
 Aseco::addChatCommand('videos','Sets up the tmx videos command environment');
+Aseco::addChatCommand('video','Gives latest video in chat');
 
 function tmxv_onStartup($aseco) {
 	global $TMXV;
@@ -24,6 +25,11 @@ function chat_videos($aseco, $command) {
 	$TMXV->onCommand($command);
 }
 
+function chat_video($aseco, $command) {
+    global $TMXV;
+    $TMXV->onVideoCommand($command);
+}
+
 class TMXV {
     private $config = array();
     private $videos = array();
@@ -32,7 +38,23 @@ class TMXV {
 		$this->msgConsole('Plugin TMX Video by malun22 initialized.');
 	}
 
-    public function onCommand($command) {        
+    public function onCommand($command) {  
+        $player = $command['author'];
+        $login = $player->login;
+
+        // Show videos manialink
+        if ($this->hasVideos()) {
+            $this->showVideosManialink($player);
+        } else {
+            $this->msgPlayer($login, '{#warning}No videos found for this track.');
+        }
+    }
+
+    private function hasVideos() {
+        return isset($this->videos) && count($this->videos) > 0;
+    }
+
+    public function onVideoCommand($command) {
         $player = $command['author'];
         $login = $player->login;
 
@@ -43,13 +65,55 @@ class TMXV {
         if (!isset($command['params'][1])) $command['params'][1] = '';
 
         if ($command['params'][0] == '') {
-            // Show videos manialink
-            $this->showVideosManialink($player);
+            if ($this->hasVideos()) {
+                $this->sendVideoInChat($login, $this->videos[0]['LinkId'], $this->videos[0]['Title']);
+            } else {
+                $this->msgPlayer($login, '{#warning}No videos found for this track.');
+            }
         } elseif ($command['params'][0] == 'help') {
             // Show help manialink
+            $this->showHelpManialink($login);
+        } elseif ($command['params'][0] == 'latest') {
+            if ($this->hasVideos()) {
+                $this->sendVideoInChat($login, $this->videos[0]['LinkId'], $this->videos[0]['Title']);
+            } else {
+                $this->msgPlayer($login, '{#warning}No videos found for this track.');
+            }
+        } elseif ($command['params'][0] == 'oldest') {
+            if ($this->hasVideos()) {
+                $this->sendVideoInChat($login, $this->videos[count($this->videos)-1]['LinkId'], $this->videos[count($this->videos)-1]['Title']);
+            } else {
+                $this->msgPlayer($login, '{#warning}No videos found for this track.');
+            }
         } else {
-            $this->msgPlayer($login, 'Unknown command, use /videos help for more information.');
+            $this->msgPlayer($login, '{#warning}Unknown command, use /videos help for more information.');
         }
+    }
+
+    private function sendVideoInChat($login, $videoId, $videoTitle) {
+        $this->msgPlayer($login, 'Watch $l[' . $this->buildLink($videoId) . ']' . $videoTitle . '$g{#server} on YouTube.');
+    }
+
+    private function showHelpManialink($login) {
+        $header = '{#black}/video$g will give the latest video in chat:';
+
+        $help = array();
+        $help[] = array('...', '{#black}help',
+                        'Shows this help window');
+        $help[] = array('...', '{#black}latest',
+                        'Gives the latest video in chat');
+        $help[] = array('...', '{#black}oldest',
+                        'Gives the oldest video in chat');
+        $help[] = array();
+        $help[] = array('{#black}/videos', '', 'Gives all videos in a window');
+        $help[] = array();
+		
+        // display ManiaLink message
+		display_manialink($login, $header, array('Icons64x64_1', 'TrackInfo', -0.01), $help, array(1.1, 0.05, 0.3, 0.75), 'OK');
+    }
+
+    private function buildLink($videoId) {
+        return 'http://youtu.be/' . $videoId;
     }
 
     private function showVideosManialink($player) {
@@ -58,7 +122,7 @@ class TMXV {
         if ($aseco->server->getGame() == 'TMF') {
             $AmountPlayerStats = count($this->videos)+16;
             
-            $header = 'Videos for ' . $aseco->challenge->name;
+            $header = 'Videos for ' . $aseco->server->challenge->name;
             $player->msgs = array();
             $player->msgs[0] = array(1, $header, array(1), array('Icons64x64_1', 'TrackInfo'));
     
@@ -66,7 +130,7 @@ class TMXV {
                 if (empty($this->videos[$i-1])) {
                     $data[] = array('');
                 } else {
-                    $data[] = array('$l[http://youtu.be/' . $this->videos[$i-1]['LinkId'] . "]" . $this->videos[$i-1]['Title']);
+                    $data[] = array('$l[' . $this->buildLink($this->videos[$i-1]['LinkId']) . "]" . $this->videos[$i-1]['Title']);
                 }
                 if ($i % 16 == 0) {
                         $player->msgs[] = $data;
@@ -92,7 +156,7 @@ class TMXV {
     private function loadVideos($tmxid) {
         $this->msgConsole('Requesting videos for track with TMX ID ' . $tmxid);
 
-        $url = 'https://tmnf.exchange/api/videos?fields=LinkId%2CTitle%2CThumbnail&trackid=' . $tmxid;
+        $url = 'https://tmnf.exchange/api/videos?fields=LinkId%2CTitle%2CPublishedAt&trackid=' . $tmxid;
 
         $this->msgConsole('Requesting ' . $url);
 
@@ -105,10 +169,15 @@ class TMXV {
 
         $result = json_decode($output, true);
 
-        if (isset($result) && isset($result['Results']) && count($result['Results']) > 0)
+        if (isset($result) && isset($result['Results']) && count($result['Results']) > 0) {
             $this->videos = $result['Results'];
-        else
-            $this->videos = array();        
+            // Sort by publishedAt
+            usort($this->videos, function($a, $b) {
+                return strtotime($b['PublishedAt']) - strtotime($a['PublishedAt']);
+            });
+        } else {
+            $this->videos = array();
+        }        
 
         $this->msgConsole('Found ' . count($this->videos) . ' videos for track with TMX ID ' . $tmxid);
     }
