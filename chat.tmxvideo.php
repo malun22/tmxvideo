@@ -1,5 +1,43 @@
 <?php
 
+  /*******************************************************\
+ *                  TMX Video Plugin                       *
+ ***********************************************************
+ *                        Features                         *
+ * - Adds a chatcommand connected to the new TMX video	   *
+ *   system.                                               *
+ * - /video                                                *
+ * - /videos                                               *
+ ***********************************************************
+ *                    Created by malun22                   *
+ ***********************************************************
+ *              Dependencies: None                         *
+ ***********************************************************
+ *                         License                         *
+ * LICENSE: This program is free software: you can         *
+ * redistribute it and/or modify it under the terms of the *
+ * GNU General Public License as published by the Free     *
+ * Software Foundation, either version 3 of the License,   *
+ * or (at your option) any later version.                  *
+ *                                                         *
+ * This program is distributed in the hope that it will be *
+ * useful, but WITHOUT ANY WARRANTY; without even the      *
+ * implied warranty of MERCHANTABILITY or FITNESS FOR A    *
+ * PARTICULAR PURPOSE.  See the GNU General Public License *
+ * for more details.                                       *
+ *                                                         *
+ * You should have received a copy of the GNU General      *
+ * Public License along with this program.  If not,        *
+ * see <http://www.gnu.org/licenses/>.                     *
+ ***********************************************************
+ *                       Installation                      *
+ * - Put this plugin in /XASECO/plugins				       *
+ * - activate the plugin in XASECO/plugins.xml             *
+ * - Download cacert.pem from                              *
+ *   https://curl.se/docs/caextract.html and place it in   *
+ *   the XASECO root folder.                               *
+ \*********************************************************/
+
 global $TMXV;
 
 Aseco::registerEvent("onStartup", "tmxv_onStartup");
@@ -31,7 +69,6 @@ function chat_video($aseco, $command) {
 }
 
 class TMXV {
-    private $config = array();
     private $videos = array();
 
 	public function onStartup() {
@@ -90,8 +127,12 @@ class TMXV {
         }
     }
 
+    private function saveVideoTitle($title) {
+        return str_replace('$', '$$', $title);
+    }
+
     private function sendVideoInChat($login, $videoId, $videoTitle) {
-        $this->msgPlayer($login, 'Watch $l[' . $this->buildLink($videoId) . ']' . $videoTitle . '$g{#server} on YouTube.');
+        $this->msgPlayer($login, 'Watch $l[' . $this->buildLink($videoId) . ']' . $this->saveVideoTitle($videoTitle) . '$l{#server} on YouTube.');
     }
 
     private function showHelpManialink($login) {
@@ -130,7 +171,7 @@ class TMXV {
                 if (empty($this->videos[$i-1])) {
                     $data[] = array('');
                 } else {
-                    $data[] = array('$l[' . $this->buildLink($this->videos[$i-1]['LinkId']) . "]" . $this->videos[$i-1]['Title']);
+                    $data[] = array('$l[' . $this->buildLink($this->videos[$i-1]['LinkId']) . "]" . $this->saveVideoTitle($this->videos[$i-1]['Title']));
                 }
                 if ($i % 16 == 0) {
                         $player->msgs[] = $data;
