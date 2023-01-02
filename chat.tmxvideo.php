@@ -32,10 +32,10 @@
  ***********************************************************
  *                       Installation                      *
  * - Put this plugin in /XASECO/plugins				       *
- * - activate the plugin in XASECO/plugins.xml             *
+ * - Activate the plugin in XASECO/plugins.xml             *
  * - Download cacert.pem from                              *
  *   https://curl.se/docs/caextract.html and place it in   *
- *   the XASECO root folder.                               *
+ *   the XASECO root folder                                *
  \*********************************************************/
 
 global $TMXV;
